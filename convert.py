@@ -13,7 +13,7 @@ import os
 import logging
 from argparse import ArgumentParser
 import shutil
-
+from glob import glob
 # This Python script is based on the shell converter script provided in the MipNerF 360 repository.
 parser = ArgumentParser("Colmap converter")
 parser.add_argument("--no_gpu", action='store_true')
@@ -64,6 +64,32 @@ if not args.skip_matching:
     if exit_code != 0:
         logging.error(f"Mapper failed with code {exit_code}. Exiting.")
         exit(exit_code)
+
+# make sure .../distorted/sparse/0 is the model with the most valid images
+tmp_path = args.source_path + "/distorted/sparse"
+max_model_id = -1
+max_size = 0
+for model_folder in glob(tmp_path + "/*"):
+    model_id = int(os.path.basename(os.path.normpath(model_folder)))
+    point_filepath = os.path.join(model_folder, 'points3D.bin')
+    point_size = os.stat(point_filepath).st_size
+    if point_size > max_size:
+        max_size = point_size
+        max_model_id = model_id
+
+# swap folder
+if max_model_id > 0:
+    src_folder = os.path.join(tmp_path, '0')
+    dst_folder = os.path.join(tmp_path, 'tmp')
+    shutil.move(src_folder, dst_folder)
+
+    dst_folder = src_folder
+    src_folder = os.path.join(tmp_path, "{}".format(max_model_id))
+    shutil.move(src_folder, dst_folder)
+
+    dst_folder = src_folder
+    src_folder = os.path.join(tmp_path, 'tmp')
+    shutil.move(src_folder, dst_folder)
 
 ### Image undistortion
 ## We need to undistort our images into ideal pinhole intrinsics.
